@@ -14,7 +14,7 @@ hourselectX = hourselect/2
 
 
 layer = 0
-do idomain = 1,1; 2,2 ;  3, 3
+do idomain =  2,2 ;  3, 3
   WRFchemJun = addfile("/oasis/projects/nsf/uok114/hujun/wrfout_d0"+idomain+"_2016-12-06_12:00:00.nc","r")
   WRFchemJunEmiss = addfile("/oasis/projects/nsf/uok114/hujun/wrfchemi_00z_d0"+idomain+".nc","r")
 ;  Emiss_CO2 = addfile("/oasis/projects/nsf/uok114/xhu2/Codes/WRFV3.9.1/WRFV3_kpp_config66_NETCDF4_HiltonParameter/test/em_real/wrfchemi_d0"+idomain+"_valueFromODIAC_China12month_2016_Shanghai.nc","r")
@@ -30,12 +30,18 @@ do idomain = 1,1; 2,2 ;  3, 3
   else 
    figurename = "wrfout_d0"+idomain+"_3VarsOverlayObs_6"; for SatelliteData 
   end if 
-;  figurename = "wrfout_d0"+idomain+"_4VarsOverlayObs_1"; thetae1000 m  (/10, 15, 20/)
-;  figurename = "wrfout_d0"+idomain+"_4VarsOverlayObs_2"; full domain 
-;  figurename = "wrfout_d0"+idomain+"_4VarsOverlayObs_3"; thetae1000 m  (/12, 17, 22/)
+  if (idomain.eq.2) then 
+;   figurename = "wrfout_d0"+idomain+"_3VarsOverlayObs_1"; thetae1000 m  (/10, 15, 20/)
+    XCO2_2ndDomain = False 
+   if (XCO2_2ndDomain) then 
+    figurename = "wrfout_d0"+idomain+"_3VarsOverlayObs_2"; add CO2 ; full domain 
+   else 
+     figurename = "wrfout_d0"+idomain+"_3VarsOverlayObs_3"; using 2nddomainXCO2 
+   end if 
+  end if 
    wks_type = "png"
-   wks_type@wkWidth = 1850
-   wks_type@wkHeight = 1850
+   wks_type@wkWidth = 1450
+   wks_type@wkHeight = 1450
 
   wks = gsn_open_wks(wks_type ,figurename)           ; ps,pdf,x11,ncgm,eps
   gsn_define_colormap(wks,"BlAqGrYeOrReVi200") ; select color map
@@ -44,13 +50,13 @@ do icorlor = 2,4
  cmap(icorlor,:) = cmap(0,:)
 end do
   gsn_define_colormap(wks,cmap) ; select color map
-
-
- do ifile= 0,dimsizes(files)-1  ; obs LT, sim UTC  4 hours difference
-  ifile_from0 =ifile
-  file_target = files(ifile) 
-  print("working on "+files(ifile))
+  file_target = files(0) 
   f     = addfile(file_target+".nc","r")
+
+  vars  = (/"AOD","XCO2","CO","NO2"/) 
+
+ do ivar= 0,dimsizes(vars)-1  ; obs LT, sim UTC  4 hours difference
+  print("working on ivar "+vars(ivar))
   fmap  = f 
   Times_char = f->Times
    Times_char(0,13) = Times_char(0,4) 
@@ -71,7 +77,7 @@ end do
       gsres@gsMarkerIndex = 16          ; circle at first
       gsres@gsMarkerThicknessF = 1
       gsres@gsMarkerSizeF = 0.01
-      gsres@gsMarkerColor      = "black"
+;      gsres@gsMarkerColor      = "black"
   tres       =  True
   tres@txFontHeightF = 0.0152005
   tres@txBackgroundFillColor = "White" 
@@ -97,17 +103,17 @@ end do
   res@tmXBMajorOutwardLengthF = 0
   res@tmXBMinorOutwardLengthF = 0
 
-   if (ifile_from0.eq.1) then 
+   if (ivar.eq.1) then 
     res@tmYLLabelsOn = True 
    else 
     res@tmYLLabelsOn = False 
    end if 
-   if (ifile_from0.eq.2) then 
+   if (ivar.eq.2) then 
     res@lbLabelBarOn = True 
    else 
     res@lbLabelBarOn = False
    end if 
-    res@vpXF             = 0.0511+0.4535512*(ifile_from0-1)
+    res@vpXF             = 0.0511+0.4535512*(ivar-1)
 
   res@vpHeightF             = 0.3820
   res@vpWidthF              = 0.45
@@ -125,8 +131,8 @@ end do
   res@cnLinesOn             = False            ; turn off contour lines
   res@cnLineLabelsOn        = False            ; turn off contour labels
 
-;  res@lbLabelStride         =2 
-  res@lbLabelAutoStride = True ;
+  res@lbLabelStride         =2 
+;  res@lbLabelAutoStride = True ;
   res@tmYLLabelStride = 2
   res@tmXBLabelStride = 2
 
@@ -173,7 +179,7 @@ end do
   res@cnLevelSelectionMode  = "ManualLevels"
 
   if (iplot.eq.0) then 
- TIMEWRF=WRFchemJun->Times(hourselect(ifile)+36,:12)  
+ TIMEWRF=WRFchemJun->Times(hourselect(0)+36,:12)  
   print("working on WRF time "+TIMEWRF)
    CST_hr = mod(stringtoint(chartostring(Times_char(0, 11:12)))+24+8, 24)
    res@gsnRightString = "" ; chartostring(fmap->Times(0,:12)) + "UTC "  +CST_hr +"LT"
@@ -181,16 +187,13 @@ end do
    U10     = f->U10(0,:,:)
    V10     = f->V10(0,:,:)
      HGT     = f->HGT(0,:,:)
-   if (ifile_from0.eq.2) then
+   if (ivar.eq.2) then
      x = Emiss_CO2->E_CO2(0,0,:,:) 
      x = (/x/1000./)
      res@lbTitleString    = "E_CO2 ~C~ m s~S~-1" 
 ;    res@cnMaxLevelValF        = 20 
 ;    res@cnMinLevelValF       = 2 
 ;    res@cnLevelSpacingF   =  2. 
-    res@cnMaxLevelValF    = 1.5 ; for AIRS CO after *1e7
-    res@cnMinLevelValF    = 1.3
-    res@cnLevelSpacingF   =  .025
    else 
 ;  res@cnMaxLevelValF        = 50 
 ;  res@cnMinLevelValF       = 15 
@@ -207,7 +210,7 @@ end do
   res@cnMaxLevelValF        = 6 
   res@cnMinLevelValF       = 4 
   res@cnLevelSpacingF   =  0.2 
- TIMEWRF=WRFchemJun->Times(hourselect(ifile)+36,:12)  
+ TIMEWRF=WRFchemJun->Times(hourselect(ivar)+36,:12)  
   print("working on WRF time "+TIMEWRF)
    CST_hr = mod(stringtoint(chartostring(Times_char(0, 11:12)))+24+8, 24)
    res@gsnRightString = chartostring(fmap->Times(0,:12)) + "UTC "  +CST_hr +"LT"
@@ -229,12 +232,12 @@ end do
    V10     = f->V10(0,:,:)
 ;   x = U10
 ;   x = (/sqrt(U10^2+V10^2)/)
-; x=WRFchemJun->PM2_5_DRY(hourselect(ifile)+36,0,:,:)  
+; x=WRFchemJun->PM2_5_DRY(hourselect(ivar)+36,0,:,:)  
 ;   res@lbTitleString    = "PM~B~2.5~N~ ~C~~F33~m~F~g m~S~-3" 
   res@cnMaxLevelValF        = 120 
   res@cnMinLevelValF       = 20 
   res@cnLevelSpacingF   =  20 
- x=WRFchemJun->no(hourselect(ifile)+36,0,:,:)  
+ x=WRFchemJun->no(hourselect(ivar)+36,0,:,:)  
  x=(/x*1000/)
     res@cnLevelSelectionMode  = "ExplicitLevels"
    res@cnLevels= (/2, 5, 10, 20, 40,70,100, 200/)
@@ -279,7 +282,7 @@ end do
 ;   x  = f->EXCH_H(0,1,:,:) 
 ;  printVarSummary(x)
 ;  printVarSummary(XCO2_Dec89->XCO2)
-   x= XCO2_Dec89->XCO2(hourselectX(ifile),:,:)
+   x= XCO2_Dec89->XCO2(hourselectX(ivar),:,:)
    res@tmXBLabelsOn = True 
   res@lbTitleString    = "XCO~B~2~N~~C~ppmv"
   res@cnMinLevelValF       = 404 ;
@@ -330,18 +333,18 @@ end do
   va_1000wrf@lon2d = long2d
   va_1000wrf@lat2d = lat2d
 
-;  plot(iplot+5*ifile_from0)                 = gsn_csm_vector_scalar_map(wks,ua_1000wrf,va_1000wrf,x,res)
+;  plot(iplot+5*ivar)                 = gsn_csm_vector_scalar_map(wks,ua_1000wrf,va_1000wrf,x,res)
   if(iplot.gt.0) then 
    plot                 = gsn_csm_vector_scalar_map(wks,u,v,x,res)
-    if (ifile.gt.0) then 
+    if (ivar.gt.0) then 
      draw(plot)
     end if 
   else 
   res_ter                       = True             ; plot mods desired
-  res_ter@vpXF             = 0.0511+0.4535512*(ifile_from0-1)
   res_ter@vpHeightF             = 0.3820
   res_ter@vpWidthF              = 0.45
-  res_ter@vpYF              =0.98-(0.3820+0.0051)*iplot
+  res_ter@vpXF             = 0.0511+0.4535512*(mod(ivar,2))
+  res_ter@vpYF              =0.98-(0.45555)*(ivar/2)
   res_ter@lbLabelFontHeightF = 0.012
   res_ter@tmXBLabelFontHeightF = 0.0102
   res_ter@tmYLLabelFontHeightF = 0.0102
@@ -379,10 +382,10 @@ end do
   res_ter@pmTickMarkDisplayMode = "Always"         ; turn on nicer tickmarks
   res_ter@tmYLLabelStride       = 2                ; label every other tickmark
   res_ter@tmXBLabelStride       = 2
-   if (ifile_from0.eq.1) then 
-    res_ter@tmYLLabelsOn = True 
-   else 
+   if (mod(ivar,2).eq.1) then 
     res_ter@tmYLLabelsOn = False 
+   else 
+    res_ter@tmYLLabelsOn = True 
    end if 
 
 ;---Point the tickmarks inward
@@ -402,10 +405,11 @@ end do
 
 ;---Set resources for rain total contour plot
   res_tot                       = True
-   if (ifile_from0.eq.1) then 
-    res_tot@tmYLLabelsOn = True 
-   else 
+  res_tot@lbLabelStride         =2 
+   if (mod(ivar,2).eq.1) then ; did not take effecty 
     res_tot@tmYLLabelsOn = False 
+   else 
+    res_tot@tmYLLabelsOn = True 
    end if 
   res_tot@lbOrientation   = "horizontal"; "vertical"
   res_tot@lbLabelFontHeightF = 0.012
@@ -417,7 +421,7 @@ end do
   res_tot@lbBottomMarginF = 0.0513
   res_tot@lbLeftMarginF = 0.30513
   res_tot@lbRightMarginF = 0.30513
-  res_tot@lbTitleOffsetF = 0.02
+  res_tot@lbTitleOffsetF = 0.0002
   res_tot@lbTitleJust = "CenterCenter"
 
   res_tot@gsnStringFontHeightF = res@gsnStringFontHeightF; = 0.0105
@@ -425,10 +429,10 @@ end do
   res_tot@tmYLLabelFontHeightF = 0.0102
   res_tot@gsnFrame              = False
   res_tot@gsnDraw               = False
-  res_tot@vpXF             = 0.0511+0.4535512*(ifile_from0-1)
-  res_tot@vpYF              =0.98-(0.3820+0.0051)*iplot
   res_tot@vpHeightF             = 0.3820
   res_tot@vpWidthF              = 0.45
+  res_tot@vpXF             = 0.0511+0.4535512*(mod(ivar,2))
+  res_tot@vpYF              =0.98-(0.45555)*(ivar/2)
 
   cmap     := read_colormap_file("BlAqGrYeOrReVi200")
   cmap(0,:) = (/0,0,0,0/)    ; make first color fully transparent
@@ -461,7 +465,7 @@ end do
   res_tot@tiMainFontHeightF    = 0.018
   res_tot@gsnRightString       = res@gsnRightString ; "" ; "RAIN, mm" 
   res_tot@gsnLeftString        =  ""
-   if (ifile_from0.eq.2) then
+   if (ivar.eq.2) then
 ;    res_tot@lbTitleString    = "WSP ~C~ m s~S~-1" 
      res_tot@lbTitleString    = "E_CO2 ~C~kmol km~S~-2~N~ hr~S~-1~N~" 
    else 
@@ -469,30 +473,22 @@ end do
 ;     res_tot@lbTitleString    = "E_NO ~C~mol km~S~-2~N~ hr~S~-1~N~" 
    end if 
 
-   if (ifile_from0.eq.2) then 
-    res_tot@lbLabelBarOn = True 
-   else 
-    res_tot@lbLabelBarOn = True ; False
-   end if 
+      plot_terrain = gsn_csm_contour_map(wks,HGT,res_ter)
 
    SatelliteNC = False 
-    if (ifile.eq.0) then 
+    if (ivar.eq.2) then 
       res_tot@cnFillMode           = "RasterFill"
       res_tot@cnMaxLevelValF        =.7 
       res_tot@cnMinLevelValF       = 0.3 
       res_tot@cnLevelSpacingF   =  .05 
-      res_tot@vpXF             = 0.0511
-      res_tot@vpYF              =0.48;-(0.3820+0.0051)*iplot
-      res_ter@vpXF             = 0.0511
-      res_ter@vpYF              =0.48;-(0.3820+0.0051)*iplot
-     plot_terrain = gsn_csm_contour_map(wks,HGT,res_ter)
-    if (NO2_origSwath) then 
+
+     if (NO2_origSwath) then 
          ncol = 400 
          NO2 = readAsciiTable("Satellite_2016Dec9/NPP/NO2_1.txt", ncol, "float", 0)
          NO2_LAT = readAsciiTable("Satellite_2016Dec9/NPP/NO2_LAT_1.txt", ncol, "float", 0)
          NO2_LON = readAsciiTable("Satellite_2016Dec9/NPP/NO2_LON_1.txt", ncol, "float", 0)
-        res_tot@lbTitleString    = "NO2 swath~C~DU"
-;        res_tot@cnMinLevelValF   = 0.2 
+        NO2(:,331:) = (/NO2@_FillValue/)
+        res_tot@lbTitleString    = "NO~B~2~N~~C~DU"
        res_tot@cnFillMode           = "AreaFill"
       else 
          ncol = 31
@@ -505,10 +501,13 @@ end do
         NO2@lon2d = NO2_LON 
        plot_raintot = gsn_csm_contour(wks,NO2,res_tot)
       
-   else  
-     plot_terrain = gsn_csm_contour_map(wks,HGT,res_ter)
-     if (ifile.eq.2) then 
+   end if  
+
+     if (ivar.eq.3) then 
        res_tot@cnFillMode           = "AreaFill"
+       res_tot@cnMaxLevelValF    = 1.5 ; for AIRS CO after *1e7
+       res_tot@cnMinLevelValF    = 1.3
+       res_tot@cnLevelSpacingF   =  .025
          ncol = 34
          CO = readAsciiTable("Satellite_2016Dec9/AIRS/CO.txt", ncol, "float", 0)
          CO_LAT = readAsciiTable("Satellite_2016Dec9/AIRS/CO_LAT.txt", ncol, "float", 0)
@@ -518,7 +517,89 @@ end do
         CO@lat2d = CO_LAT
         CO@lon2d = CO_LON 
        plot_raintot = gsn_csm_contour(wks,CO,res_tot)
-     else 
+    end if  
+   
+   if (ivar.eq.1) then 
+;       data_array = readAsciiTable("/nsftor/xhu/ACT-America/OCO/OCO2_9_LITE_LEVEL2/2016/OCO-2_9_LITE_LEVEL2_extracted_2016only.nc_2sMean.txt", 4, "double", 1)
+     print("reading OCO-2")
+       data_array = readAsciiTable("OCO-2_9_LITE_LEVEL2_extracted_2016only.nc_2sMean.txt", 4, "double", 1)
+     print("finish reading OCO-2")
+       date_str =       tostring(tolong(data_array(:,0)))
+      print("prepare OCO2 time string")
+;       date     =       tochar(tostring(tolong(data_array(:,0))))
+       latitude_good  = data_array(:,2)
+       longitude_good = data_array(:,3)
+       xco2_good      = data_array(:,1)
+
+     print("reading WRF XCO2")
+      iday_dec9 = 344-1
+   if (XCO2_2ndDomain) then 
+      fXCO2 = addfile("extract_netCDF_Fortran_xhu/simulated_XCO2_domainWide_Fortran_06UTC_d0"+idomain+".nc","r")
+     print("finish reading WRF XCO2")
+      XCO2 = fXCO2->XCO2(iday_dec9,:,:)
+      XCO2@lon2d = long2d
+      XCO2@lat2d = lat2d
+      res_tot@cnFillMode           = "RasterFill"
+    else 
+      fXCO2 = addfile("extract_netCDF_Fortran_xhu/simulated_XCO2_domainWide_Fortran_06UTC_d01.nc","r")
+      res_tot@cnFillMode           = "AreaFill"
+     print("finish reading WRF XCO2")
+      fd01 = addfile("wrfinput_d01.nc","r")
+      XCO2 = fXCO2->XCO2(iday_dec9,:,:)
+      XCO2@lon2d = fd01->XLONG(0,:,:) 
+      XCO2@lat2d = fd01->XLAT(0,:,:) 
+    end if 
+      Times_char_XCO2 = fXCO2->timeUTC
+
+    CST_hr = mod(stringtoint(chartostring(Times_char_XCO2(iday_dec9,11:12)))+8+24, 24)
+   str_to_find = "2016"+chartostring(Times_char_XCO2(iday_dec9,5:6)) + chartostring(Times_char_XCO2(iday_dec9,8:9))
+   print("looking for "+str_to_find)
+   ii = str_match_ind(date_str,str_to_find)
+      lat  = latitude_good(ii)
+      lon  = longitude_good(ii)
+      xco2 = xco2_good(ii)
+      res_tot@cnMaxLevelValF        = 413.
+      res_tot@cnMinLevelValF       = 405. 
+      res_tot@cnLevelSpacingF   =  1. 
+      res_tot@lbTitleString    = "XCO~B~2~N~~C~ppmv"
+       plot_raintot = gsn_csm_contour(wks,XCO2,res_tot)
+      levels = ispan(405,413,1)
+  getvalues plot_raintot@contour
+;    "cnLevels" : levels
+;    "cnFillColors" : colors
+;    "cnFillPalette" : colors ; Attempt to reference attribute (contour) which is undefined
+  end getvalues
+  num_distinct_markers = dimsizes(levels)+1        ; number of distinct markers
+  dims=dimsizes(xco2) 
+  lat_new = new((/num_distinct_markers,dims/),double,-999)
+  lon_new = new((/num_distinct_markers,dims/),double,-999)
+  do j = 0, num_distinct_markers-1
+    if (j.eq.0) then
+      indexes = ind(xco2.lt.levels(0))
+    end if
+    if (j.eq.num_distinct_markers-1) then
+      indexes = ind(xco2.ge.max(levels))
+;     print("color "+j+" indexes="+indexes)
+    end if
+    if (j.gt.0.and.j.lt.num_distinct_markers-1) then
+      indexes = ind(xco2.ge.levels(j-1).and.xco2.lt.levels(j))
+    end if
+
+    if (.not.any(ismissing(indexes))) then 
+      npts_range = dimsizes(indexes)   ; # of points in this range.
+      lat_new(j,0:npts_range-1) = lat(indexes)
+      lon_new(j,0:npts_range-1) = lon(indexes)
+     if (j.eq.0) then
+     print("color "+j+"npts_range="+npts_range)
+     end if
+    end if
+    delete(indexes)            ; Necessary b/c "indexes" may be a different
+                               ; size next time.
+    end do ; j = 0, num_distinct_markers-1
+
+   end if 
+
+   if (ivar.eq.0) then 
        res_tot@cnFillMode           = "RasterFill"
       if (SatelliteNC) then 
         fsat = addfile("Satellite_data_Dec9Case_fromLan2020Jan.nc","r")
@@ -532,38 +613,53 @@ end do
          AOD_LON = readAsciiTable("Satellite_2016Dec9/MODIS/AOD_LON.txt", ncol, "float", 0)
        end if ; SatelliteNC 
         res_tot@lbTitleString    = "AOD"
-        printVarSummary(AOD)
         AOD@lat2d = AOD_LAT
         AOD@lon2d = AOD_LON 
-        printVarSummary(AOD)
        plot_raintot = gsn_csm_contour(wks,AOD,res_tot)
-     end if ; ifile.eq.2  
+     end if ; ivar.eq.2  
 
-    end if 
+
      overlay(plot_terrain, plot_raintot)
      draw(plot_terrain)
 
-  end if 
+  if (ivar.eq.1) then 
+  gsres               = True
+;  gsres@gsMarkerIndex = 4          ; circle at first
+  gsres@gsMarkerIndex = 16          ; circle at first
+  
+  do j = 0, num_distinct_markers-1
+    if (.not.ismissing(lat_new(j,0)))
+      gsres@gsMarkerThicknessF = 1
+      gsres@gsMarkerIndex = 16          ; Use filled dots for markers.
+;      gsres@gsMarkerSizeF = 0.012
+      gsres@gsMarkerSizeF = 0.014
+      gsres@gsMarkerColor      = cmap(1,:); "white"
+      gsn_polymarker(wks,plot_terrain,lon_new(j,:),lat_new(j,:),gsres)
+      gsres@gsMarkerSizeF = 0.011
+      gsres@gsMarkerColor      = cmap((200/(413-405))*j,:);colors(j)
+      gsn_polymarker(wks,plot_terrain,lon_new(j,:),lat_new(j,:),gsres)
+    end if
+   end do
+  end if ;   if (ivar.eq.1) then
+ 
+
+  end if  ;  where is if ?  
     res@cnLevelSelectionMode  = "ManualLevels"
   abc_show = (/"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o"/)
-;  gsn_text(wks,plot,abc_show(iplot+5*ifile_from0),-101.0,33.2,tres)
+;  gsn_text(wks,plot,abc_show(iplot+5*ivar),-101.0,33.2,tres)
 
 ;481130069 +32.819952 -96.860082        DALLAS HINTON
-lat  = (/32.564952  ,  32.819952/)
-lon  = (/-96.317677,   -96.860082/)
-name = (/"  Kaufman","HINTON"/)
       gsres               = True
       gsres@gsMarkerThicknessF = 1
       gsres@gsMarkerSizeF = 0.015
-      gsres@gsMarkerColor      = "black"
+;      gsres@gsMarkerColor      = "black"
       gsres@gsMarkerIndex = 13          ; circle at first
-;  gsn_polymarker(wks,plot,lon(1:1),lat(1:1),gsres)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;  draw(plot(iplot+ifile_from0*3))
+;  draw(plot(iplot+ivar*3))
   end do ; iplot
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-   end do ; ifile
+   end do ; ivar
   frame(wks)
 
 ;  system("convert -density 300 -resize 1500x1500 -trim  "+figurename+".eps /nsftor/xhu/public_html/CO2_and_otherGHG/WRFV3.9.1.1/YSU/wrfchem_junhu.2016010100_Dec9/"+figurename+".png")
